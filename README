@@ -1,0 +1,3 @@
+
+This repository contains code to calculate the Hamming-distance distribution of algebraic block codes
+with parameters (q, M, n), using two different approaches.
