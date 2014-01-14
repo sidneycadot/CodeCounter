@@ -1,0 +1,301 @@
+\documentclass[a4paper]{article}
+\usepackage{a4wide}
+\usepackage{parskip}
+\usepackage{charter}
+\usepackage{amsmath}
+\author{Sidney~Cadot}
+\title{A complete classification of block codes with a small number of codewords.}
+\date{}
+
+\newcommand{\colcount}{\mathrm{colcount}}
+\newcommand{\codecount}{\mathrm{K}}
+\newcommand{\maxdistance}{\mathrm{maxdistance}}
+
+\newtheorem{definition}{Definition}
+\newtheorem{conjecture}{Conjecture}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+A $q$-ary $(n,M)$ block code is a set of $M$ codewords, each having $n$ symbols drawn from the finite alphabet $F_q = \{\lambda_1, \lambda_2, \ldots, \lambda_q\}$.
+A codeword $\mathbf{x}$ can thus be written as $\mathbf{x}_1 \mathbf{x}_2 \cdots \mathbf{x}_n$, where every $\mathbf{x}_i \in F_q$.
+
+The Hamming distance of two equal-length codewords is defined as the number of places where they have different symbols:
+
+\begin{equation}
+d(\mathbf{x},\mathbf{y})=\sum_{i=1}^{n} \mbox{if $\mathbf{x}_i \neq \mathbf{y}_i$ then $1$ else $0$}
+\label{eq:hamming-words}
+\end{equation}
+
+The Hamming distance of a block code $C$ is the minimum of the pairwise distances of its constituent codewords:
+
+\begin{equation}
+d(C)=\min \left\{ d(\mathbf{x},\mathbf{y}) | \mathbf{x},\mathbf{y} \in C, \mathbf{x} \neq \mathbf{y} \right\}
+\label{eq:hamming-code}
+\end{equation}
+
+The Hamming distance is an important property of a code $C$. Given the parameters $q$, $n$, and $M$, it is an interesting problem to find codes
+that have a large, or even maximum possible, Hamming distance $d$, as these codes provide good protection against symbol distortion during
+transmission. To emphasize the importance attached to the Hamming distance code, it is customary to speak of a $q$-ary $(n,M,d)$-code.
+
+This paper presents some results towards determining the existence of $q$-ary $(n,M,d)$ codes for different values of $q$, $n$, $M$, and $d$,
+which is, in general, an open problem. In particular, we will discuss the existence of codes with a small value of $M$. Although these codes
+are rarely useful in practical applications, it is our hope that the possibility of complete classification of these codes as demonstrated in this
+paper will provides interesting opportunities for further research.
+
+Section~\ref{sec:code-matrices} introduces the concept of \emph{code matrices} and defines the function $K$.
+
+Section~\ref{sec:calculating-codecount} describes a method for explicitly calculating the $K$ function for small values of $M$, the number of code words in a code.
+
+Section~\ref{sec:easy-results} gives some easy results for small parameter values, including a complete classification of codes with two code words.
+
+Section~\ref{sec:case-M3} describes a complete classification of codes with three code words.
+
+Section~\ref{sec:case-M4} describes a complete classification of codes with four code words.
+
+Section~\ref{sec:conclusions} summarizes the results, provides pointers for further research, and acknowledges contributions.
+
+\section{Code matrices and classification using the $\codecount$ function}
+\label{sec:code-matrices}
+
+In this paper we will consider a representation of a code as a \emph{code matrix} with $M$ rows and $n$ columns, with each entry equal to one of the symbols in $F_q$.
+The Hamming distance of such a matrix is defined by applying equation~(\ref{eq:hamming-code}) to its constituent row vectors.
+
+Every $q$-ary $(n,M)$-code can be represented as such a matrix in $M!$ ways by re-ordering of rows. The Hamming distance of such a matrix is equal
+to the distance of the code.
+
+The converse is not quite true: not every code matrix corresponds to a code, since a code matrix can have identical rows.
+In that case, the Hamming distance of the code matrix is \emph{zero} --- something that cannot happen with a true block code.
+
+With the concept of a code matrix in place, we can now define the function $K$ that is the central topic of this paper.
+
+\begin{definition}
+$\codecount(q,M,n,d)$ denotes the number of possible $M \times n$ matrices having entries chosen from $F_q$, with Hamming distance $d$.
+The function $\codecount$ is defined for $q \ge 1$, $M \ge 2$, $n \ge 1$, and $d \ge 0$.
+\end{definition}
+
+An interesting interpretation of the function $\codecount$ is as follows: fill an $M \times n$ matrix at random with entries chosen from $F_q$. This can be done in $q^{M \cdot n}$ ways.
+The probability of hitting upon a code with distance $d$ is given by:
+
+\begin{equation}
+P(\mbox{randomly generated code has distance $d$}) = \frac{\codecount(q,M,n,d)}{q^{M \cdot n}}
+\label{eq:probability}
+\end{equation}
+
+The analysis described in this article was, in fact, started by performing the above randomized experiment in search of codes with a large Hamming distance.
+
+An obvious application of the function $K$ is given by finding the maximum Hamming distance $d$ attainable given $q$, $M$, and $d$:
+
+\begin{equation}
+\maxdistance(q,M,n) = \max \left\{ d | \codecount(q,M,n,d) > 0 \right\}
+\label{eq:maxdistance}
+\end{equation}
+
+\section{Calculating $\codecount(q,M,n,d)$}
+\label{sec:calculating-codecount}
+
+\textbf{THIS SECTION IS VERY MUCH INCOMPLETE}
+
+The relations described below were found using a lengthy computer search followed by analysis of the results. This section describes that experiment.
+
+\subsection{Enumerating possible columns}
+
+Table~\ref{table:colcount-values} shows the number of essentially different columns as a function of $q$ and $M$.
+
+\begin{definition}
+$\colcount(q,M)$ denotes the number of `essentially different' column equivalence classes for code matrices over alphabet $F_q$ and column size $M$.
+\end{definition}
+
+\begin{table}[h]
+\tiny
+\centering
+\begin{tabular}{|r|rrrrrrrrrrr|}
+\hline
+       & $q=1$ &  $q=2$ &   $q=3$ &    $q=4$ &    $q=5$ &    $q=6$ &    $q=7$ &    $q=8$ &    $q=9$ &   $q=10$ &   $q=11$ \\
+\hline
+$M=2$  &   $1$ &    $2$ &     $2$ &      $2$ &      $2$ &      $2$ &      $2$ &      $2$ &      $2$ &      $2$ &      $2$ \\
+$M=3$  &   $1$ &    $4$ &     $5$ &      $5$ &      $5$ &      $5$ &      $5$ &      $5$ &      $5$ &      $5$ &      $5$ \\
+$M=4$  &   $1$ &    $8$ &    $14$ &     $15$ &     $15$ &     $15$ &     $15$ &     $15$ &     $15$ &     $15$ &     $15$ \\
+$M=5$  &   $1$ &   $16$ &    $41$ &     $51$ &     $52$ &     $52$ &     $52$ &     $52$ &     $52$ &     $52$ &     $52$ \\
+$M=6$  &   $1$ &   $32$ &   $122$ &    $187$ &    $202$ &    $203$ &    $203$ &    $203$ &    $203$ &    $203$ &    $203$ \\
+$M=7$  &   $1$ &   $64$ &   $365$ &    $715$ &    $855$ &    $876$ &    $877$ &    $877$ &    $877$ &    $877$ &    $877$ \\
+$M=8$  &   $1$ &  $128$ &  $1094$ &   $2795$ &   $3845$ &   $4111$ &   $4139$ &   $4140$ &   $4140$ &   $4140$ &   $4140$ \\
+$M=9$  &   $1$ &  $256$ &  $3281$ &  $11051$ &  $18002$ &  $20648$ &  $21110$ &  $21146$ &  $21147$ &  $21147$ &  $21147$ \\
+$M=10$ &   $1$ &  $512$ &  $9842$ &  $43947$ &  $86472$ & $109299$ & $115179$ & $115929$ & $115974$ & $115975$ & $115975$ \\
+$M=11$ &   $1$ & $1024$ & $29525$ & $175275$ & $422005$ & $601492$ & $665479$ & $677359$ & $678514$ & $678569$ & $678570$ \\
+\hline
+\end{tabular}
+\caption{Values of $\colcount(q,M)$}
+\label{table:colcount-values}
+\end{table}
+
+\begin{conjecture}
+$\colcount(q,M)=\sum_{i=1}^{q} \mathcal{S}_M^{(i)}$
+\end{conjecture}
+
+Here, $\mathcal{S}$ is the Stirling number of the second kind.
+% Unfortunately, this relation is beyond the mathematical capability of the author to prove.
+
+\section{The function $\codecount$ for small parameter values}
+\label{sec:easy-results}
+
+In this section, some base cases will be established for the function $\codecount$ for the smallest possible values of its parameters $q$, $n$, $M$, and $d$.
+
+In the following sections, we then hope to establish recursive relations between different values of $\codecount(q,M,n,d)$ that will allow us to
+calculate $\codecount$ for any value of its parameters, using dynamic programming.
+
+If this is indeed possible, and the calculations involved are not too computationally expensive, we would effectively have solved a
+central open problem of coding theory, which is to determine whether a given $q$-ary $(n,M,d)$-code exists.
+
+(Hope springs eternal \ldots)
+
+\subsection{First base case: $q=1$}
+
+If the number of actual rows $M$ exceeds the number of possible rows (which is~$q^n$), at least two rows will be identical, which implies that $d=0$:
+
+\begin{equation}
+\codecount(q,M,n,d) = \left\{
+\begin{array}{ll}
+q^{M \cdot n} & \mbox{if $M > q^n$ and $d=0$} \\
+0             & \mbox{if $M > q^n$ and $d>0$}
+\end{array}
+\right.
+\label{eq:pigeonhole}
+\end{equation}
+
+Equation~(\ref{eq:pigeonhole}) completely determines the case $q=1$, since, given that $M \ge 2$, the requirement $M > q^n$ is always met:
+
+\begin{equation}
+\codecount(1,M,n,d) = \left\{
+\begin{array}{ll}
+1 & \mbox{if $d=0$} \\
+0 & \mbox{if $d>0$}
+\end{array}
+\right.
+\label{eq:pigeonhole-q1}
+\end{equation}
+
+\subsection{Second base case: $d=0$}
+
+First we note that no code matrices exist where the Hamming distance exceeds the code word length, simply because the Hamming distance of two codewords can never exceed the code word length:
+
+\begin{equation}
+\codecount(q, M, n, d) = 0 \mbox{ if } d>n
+\label{eq:case-q1}
+\end{equation}
+
+For any possible choice of $q$, $M$, and $n$, a total of $q^{M \cdot n}$ code matrices is possible.
+Each of these code matrices has a Hamming distance $d$ with $0 \le d \le n$.
+The total number of matrices is thus equal to the sum of the number of possible matrices with each of the possible values of $d$:
+
+\begin{equation}
+\sum_{d=0}^{n} \codecount(q, M, n, d) = q^{M \cdot n}
+\label{eq:sum-over-d-starting-at-0}
+\end{equation}
+
+We now consider the code matrices with $d \ge 1$, i.e., the code matrices where all rows are different.
+Since $q^n$ different codewords are possible, we can make $\binom{q^n}{M}$ selections of $M$ codewords that are distinct\footnote{Note that $\binom{a}{b}$ is $0$ if $b>a$.}.
+We can order these $M$ codewords in $M!$ ways; this takes us to the following expression:
+
+\begin{equation}
+\sum_{d=1}^{n} \codecount(q, M, n, d) = \binom{q^n}{M} \cdot M!
+\label{eq:sum-over-d-starting-at-1}
+\end{equation}
+
+The number of matrices that have $d=0$ can be found by subtracting equation~(\ref{eq:sum-over-d-starting-at-1}) from equation~(\ref{eq:sum-over-d-starting-at-0}):
+
+\begin{equation}
+\codecount(q, M, n, 0) = q^{M \cdot n} - \binom{q^n}{M} \cdot M!
+\label{eq:case-d0}
+\end{equation}
+
+\subsection{Third base case: $n=1$}
+
+Consider code matrices that have a single column ($n=1$). In that case, $d$ must be either $0$ or $1$.
+
+The case $d=0$ is a special case of equation~(\ref{eq:case-d0}):
+
+\begin{equation}
+\codecount(q, M, 1, 0) = q^M - \binom{q}{M} \cdot M!
+\label{eq:case-n1d0}
+\end{equation}
+
+The case $d=1$ is given by substituting $n=1$ into equation~(\ref{eq:sum-over-d-starting-at-1}):
+
+\begin{equation}
+\codecount(q, M, 1, 1) = \binom{q}{M} \cdot M!
+\label{eq:case-n1d1}
+\end{equation}
+
+%A modest application.
+
+\subsection{Fourth base case: $M=2$}
+
+Consider code matrices that have two rows ($M=2$) and Hamming distance~$d$.
+
+The first row can have $q^n$ different values.
+The second row differs from the first row in $d$ columns.
+These can be selected out of $n$ columns in~$\binom{n}{d}$~ways.
+
+Lastly, a single column that is different can be so in $(q-1)$ ways, given that the top entry of the column is fixed.
+Thus, the $d$ columns that are different can be different in $(q-1)^d$~ways.
+This gives us:
+
+\begin{equation}
+\codecount(q, 2, n, d) = q^n \cdot \binom{n}{d} \cdot (q-1)^d
+\label{eq:case-M2}
+\end{equation}
+
+Equation~(\ref{eq:case-M2}) provides a complete classification of block-codes with two code words\footnote{This is true even for $q=1$ if we adopt the
+convention that $0^0=1$.} In particular, $\maxdistance(q,2,n)$ (as defined in equation~(\ref{eq:maxdistance})) is simply equal to $n$, unless $q=1$, in which case it is $0$.
+
+Unfortunately, this does not teach us anything new: for any value of $q \ge 2$ and $n \ge 1$,
+we can make a code having distance $d$ in many ways, e.g. by simply making a repetition code with two codewords made entirely of symbols $\lambda_1$ and $\lambda_2$, respectively.
+
+In the next section we'll tackle the somewhat more interesting case of $M=3$.
+
+\section{The case $M=3$}
+\label{sec:case-M3}
+
+\textbf{THIS SECTION IS VERY MUCH INCOMPLETE}
+
+A computer search was conducted to exhaustively enumerate $\codecount$ values for
+the case $M=3$. An interesting pattern emerged that will be proven below. First, we state the pattern:
+
+\begin{equation}
+\codecount(q, 3, n, d) = q^n \cdot \binom{n}{d} \cdot (q-1)^d \cdot (3 \cdot q^n - \frac{p_d(q, n)}{d!})
+\end{equation}
+
+Here, $p_d$ is a multinomial expression with integer coefficients depending on $d$.
+
+Table~\ref{table:pd} tabulates $p_d$.
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+$d$ & $p_d$ \\
+\hline
+$0$ & $2$ \\
+$1$ & $5 - q + 3 \cdot n \cdot q - 3 \cdot n$ \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Values for $p_d$ for case $M=3$}
+\label{table:pd}
+\end{table}
+
+\section{The case $M=4$}
+\label{sec:case-M4}
+
+\textbf{THIS SECTION IS TO BE WRITTEN}
+
+\section{Conclusions, Recommendations, Acknowledgements}
+\label{sec:conclusions}
+
+\textbf{THIS SECTION IS TO BE WRITTEN}
+
+\end{document}
