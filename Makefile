@@ -1,7 +1,7 @@
 
 CXXFLAGS = -W -Wall -O3
 
-LDLIBS=-lgmpxx
+LDLIBS=-lgmpxx -lgmp
 
 .PHONY : clean default
 

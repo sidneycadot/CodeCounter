@@ -3,11 +3,11 @@
 // smart-code-counter.cc //
 ///////////////////////////
 
-// Copyright (c) 2008-2010 by Sidney Cadot
+// Copyright (c) 2008-2015 by Sidney Cadot
 
 // This program calculates the code-distance distribution of all possible M x n matrices, with q possible elements.
 // There are q ** (M*n) such matrices.
-//     The distance of two words (rows in the matrix) is the number of elements in which they differ.
+// The distance of two words (rows in the matrix) is the Hamming distance, i.e., the number of positions in which they differ.
 
 #include <cassert>
 #include <cstdlib>
@@ -72,7 +72,7 @@ struct Settings
 
     struct ParseError
     {
-        std::string message;
+        const std::string message;
         ParseError(const std::string & message) : message(message) {}
     };
 
@@ -171,26 +171,25 @@ typedef std::valarray<unsigned> BooleanValArray;
 // Their default "less" function is no good, since it is element-wise.
 
 template <typename T>
-class compare_valarray
+struct compare_valarray
 {
-    public:
-        bool operator () (const T & lhs, const T & rhs) const
-        {
-            assert(lhs.size() == rhs.size());
+    bool operator () (const T & lhs, const T & rhs) const
+    {
+        assert(lhs.size() == rhs.size());
 
-            for (size_t i = 0; i < lhs.size(); ++i)
+        for (size_t i = 0; i < lhs.size(); ++i)
+        {
+            if (lhs[i] < rhs[i])
             {
-                if (lhs[i] < rhs[i])
-                {
-                    return true;
-                }
-                if (lhs[i] > rhs[i])
-                {
-                    return false;
-                }
+                return true;
             }
-            return false;
+            if (lhs[i] > rhs[i])
+            {
+                return false;
+            }
         }
+        return false;
+    }
 };
 
 typedef std::map<BooleanValArray, unsigned, compare_valarray<BooleanValArray> > DeltaMapType; // records pairs of delta (0 or 1) and multiplicity
@@ -229,7 +228,7 @@ static void count_codes (
         if (nr_of_columns_to_fill == 0) // if we have filled all columns
         {
             // determine d, the minimal pair-wise distance
-            unsigned d_min = d_pairs.min();
+            const unsigned d_min = d_pairs.min();
 
             dcount[d_min] += codes_represented;
 
@@ -333,7 +332,7 @@ static DeltaType prepare_delta(unsigned q, unsigned M)
         }
         else
         {
-            // ThisIt is there already. Increment its multiplicity.
+            // It is there already. Increment its multiplicity.
             ++findDeltaMapEntry->second; // increment count
         }
 
@@ -360,7 +359,7 @@ static void process_settings(std::ostream & os, const Settings & settings)
         "n_hi"       " " << settings.n_hi       << " "
         "time_limit" " " << settings.time_limit << std::endl;
 
-    double  T1 = gettime();
+    double T1 = gettime();
     clock_t C1 = clock();
 
     // Walk 'q', which is the number of symbols used in the code matrix.
