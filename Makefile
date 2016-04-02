@@ -16,4 +16,4 @@ paper.pdf : paper.tex
 	pdflatex paper.tex
 
 clean :
-	$(RM) *~ dumb-code-counter smart-code-counter
+	$(RM) *~ dumb-code-counter smart-code-counter paper.aux paper.log paper.pdf

@@ -141,7 +141,7 @@ int main(int argc, char * argv[])
 
     const unsigned number_of_possible_codewords = power(q, n);
 
-    // distance count; minimum possible distance == 0, maximum possible distance == n.
+    // Distance count; minimum possible distance == 0, maximum possible distance == n.
     // The distance_count is initialized to all-zeros.
 
     vector<unsigned> distance_count(n + 1);
