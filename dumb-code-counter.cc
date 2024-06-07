@@ -23,9 +23,9 @@ using namespace std;
 // Calculate a raised to the power b.
 // NOTE: This function does not check for overflow.
 
-static unsigned power(unsigned a, unsigned b)
+static unsigned long power(unsigned long a, unsigned long b)
 {
-    unsigned r = 1;
+    unsigned long r = 1;
 
     while (b != 0)
     {
@@ -62,14 +62,14 @@ static unsigned hamming_distance(unsigned a, unsigned b, unsigned q)
 // Generate all possible codes, and determine the Hamming distance of the code while picking new code words.
 
 static void count_codes(
-                const unsigned M,
-                const unsigned number_of_possible_codewords,
-                const vector<unsigned> & HammingDistances,
-                const unsigned i,
-                const unsigned min_distance_so_far,
-                vector<unsigned> & words,
-                vector<unsigned> & distance_count
-            )
+        const unsigned           M,
+        const unsigned long      number_of_possible_codewords,
+        const vector<unsigned> & hamming_distances,
+        const unsigned           i,
+        const unsigned           min_distance_so_far,
+        vector<unsigned long>  & words,
+        vector<unsigned long>  & distance_count
+    )
 {
     if (i == M)
     {
@@ -85,18 +85,16 @@ static void count_codes(
         for (words[i] = 0; words[i] < number_of_possible_codewords; ++words[i])
         {
             // Consider the distance of the newly picked codeword to the previously picked codewords (if any).
+
             // Determine the new minimal distance of the codewords picked so far ('min_distance_so_far')
-
             unsigned new_min_distance_so_far = min_distance_so_far;
-
             for (unsigned j = 0; j < i; ++j)
             {
-                new_min_distance_so_far = std::min(new_min_distance_so_far, HammingDistances[number_of_possible_codewords * words[i] + words[j]]);
+                new_min_distance_so_far = std::min(new_min_distance_so_far, hamming_distances[number_of_possible_codewords * words[i] + words[j]]);
             }
 
-            // Proceed to pick the next code word (or present the result).
-
-            count_codes(M, number_of_possible_codewords, HammingDistances, i + 1, new_min_distance_so_far, words, distance_count);
+            // Pick the next code word.
+            count_codes(M, number_of_possible_codewords, hamming_distances, i + 1, new_min_distance_so_far, words, distance_count);
         }
     }
 }
@@ -125,38 +123,38 @@ int main(int argc, char * argv[])
 
     // Parse command line parameters.
 
-    if (argc != 4 || parse_unsigned(argv[1], &q) != 0 || parse_unsigned(argv[2], &M) != 0 || parse_unsigned(argv[3], &n) != 0 || q < 2 || M < 2 || n < 1)
+    if (argc != 4 || parse_unsigned(argv[1], &q) != 0 || parse_unsigned(argv[2], &M) != 0 || parse_unsigned(argv[3], &n) != 0 || q < 1 || M < 2 || n < 1)
     {
         cerr <<
             "Usage: " << argv[0] << " <q> <M> <n>"                       "\n"
                                                                          "\n"
-            "  q -- the number of code symbols in the alphabet ; q >= 2" "\n"
+            "  q -- the number of code symbols in the alphabet ; q >= 1" "\n"
             "  M -- the number of code words                   ; M >= 2" "\n"
-            "  n -- the number of code symbols per code word   ; n >= 1" << endl;
+            "  n -- the number of code symbols per code word   ; n >= 1" "\n" << endl;
 
         return EXIT_FAILURE;
     }
 
     // Code words range from [0 .. number_of_possible_codewords - 1], inclusive.
 
-    const unsigned number_of_possible_codewords = power(q, n);
+    const unsigned long number_of_possible_codewords = power(q, n);
 
     // Distance count; minimum possible distance == 0, maximum possible distance == n.
     // The distance_count is initialized to all-zeros.
 
-    vector<unsigned> distance_count(n + 1);
+    vector<unsigned long> distance_count(n + 1);
 
     // Pre-calculate Hamming distance between all possible pairs of code-words.
 
     cout << "# Preparing Hamming-distance matrix ..." << endl;
 
-    vector<unsigned> HammingDistances(number_of_possible_codewords * number_of_possible_codewords);
+    vector<unsigned> hamming_distances(number_of_possible_codewords * number_of_possible_codewords);
 
-    for (unsigned w1 = 0; w1 < number_of_possible_codewords; ++w1)
+    for (unsigned long w1 = 0; w1 < number_of_possible_codewords; ++w1)
     {
-        for (unsigned w2 = 0; w2 < number_of_possible_codewords; ++w2)
+        for (unsigned long w2 = 0; w2 < number_of_possible_codewords; ++w2)
         {
-            HammingDistances[number_of_possible_codewords * w1 + w2] = hamming_distance(w1, w2, q);
+            hamming_distances[number_of_possible_codewords * w1 + w2] = hamming_distance(w1, w2, q);
         }
     }
 
@@ -164,13 +162,16 @@ int main(int argc, char * argv[])
 
     cout << "# Counting codes ..." << endl;
 
-    vector<unsigned> words(M);
+    vector<unsigned long> words(M);
 
-    count_codes(M, number_of_possible_codewords, HammingDistances, 0, n, words, distance_count);
+    // The call to count_codes will generate all code matrices and update the 'distance_count' table
+    // for each full matrix.
 
-    // Present the results.
+    count_codes(M, number_of_possible_codewords, hamming_distances, 0, n, words, distance_count);
 
-    for(unsigned d = 0; d <= n; ++d)
+    // Print the results.
+
+    for (unsigned d = 0; d <= n; ++d)
     {
         cout << "q " << q << " M " << M << " n " << n << " d " << d << " count " << distance_count[d] << endl;
     }
