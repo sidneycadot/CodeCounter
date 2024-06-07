@@ -41,7 +41,7 @@ static unsigned long power(unsigned long a, unsigned long b)
     return r;
 }
 
-// This function calculates the Hamming distance of the code words a and b over the alpabet with size q,
+// This function calculates the Hamming distance of the code words a and b over the alpabet with size q.
 // This is equal to the number of digits where a and b differ when written using q-ary digits.
 
 static unsigned hamming_distance(unsigned a, unsigned b, unsigned q)
@@ -50,7 +50,7 @@ static unsigned hamming_distance(unsigned a, unsigned b, unsigned q)
 
     while (a != b)
     {
-        r += (a - b) % q != 0;
+        r += (a % q) != (b % q);
 
         a /= q;
         b /= q;
@@ -75,7 +75,6 @@ static void count_codes(
     {
         // We have picked all M codewords. The Hamming distance of the complete code is equal to 'min_distance_so_far'.
         // Count this code.
-
         ++distance_count[min_distance_so_far];
     }
     else

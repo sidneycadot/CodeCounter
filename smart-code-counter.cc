@@ -3,11 +3,12 @@
 // smart-code-counter.cc //
 ///////////////////////////
 
-// Copyright (c) 2008-2015 by Sidney Cadot
-
 // This program calculates the code-distance distribution of all possible M x n matrices, with q possible elements.
 // There are q ** (M*n) such matrices.
+//
 // The distance of two words (rows in the matrix) is the Hamming distance, i.e., the number of positions in which they differ.
+//
+// The distance of the code matrix is the minimum of the Hamming distance of all pairs of rows.
 
 #include <cassert>
 #include <cstdlib>
@@ -20,20 +21,28 @@
 #include <sys/time.h>
 #include <gmpxx.h>
 
-// The gettime() function returns the wall-clock time, in seconds-since-1970, with microsecond resolution.
+using namespace std;
 
-static double gettime()
+static int parse_unsigned(const char * s, unsigned * value)
 {
-    struct timeval tv;
+    istringstream iss(s);
 
-    int rc = gettimeofday(&tv, NULL);
-    assert(rc == 0);
+    unsigned v;
 
-    return tv.tv_sec + tv.tv_usec / 1000000.0;
+    iss >> v;
+
+    if (!iss)
+    {
+        return -1; // error
+    }
+
+    *value = v;
+
+    return 0; // success
 }
 
 // The power() function returns unsigned integer powers. 0 ** 0 returns 1.
-// Watch for overflow!
+// NOTE: This function does not check for overflow.
 
 static unsigned long power(unsigned long a, unsigned long b)
 {
@@ -63,112 +72,11 @@ static unsigned digit(unsigned long g, unsigned q, unsigned which)
     return g / power(q, which) % q;
 }
 
-struct Settings
-{
-    unsigned q_lo, q_hi;
-    unsigned M_lo, M_hi;
-    unsigned n_lo, n_hi;
-    double time_limit;
+typedef valarray<unsigned> UnsignedValArray;
+typedef valarray<unsigned> BooleanValArray;
 
-    struct ParseError
-    {
-        const std::string message;
-        ParseError(const std::string & message) : message(message) {}
-    };
-
-    Settings(int argc, char ** argv) throw (ParseError);
-};
-
-Settings::Settings(int argc, char ** argv) throw (ParseError)
-{
-    // default values
-
-    q_lo = 2;
-    q_hi = 2;
-
-    M_lo = 2;
-    M_hi = 4;
-
-    n_lo = 1;
-    n_hi = 3;
-
-    time_limit = 60.0;
-
-    // parse command line
-
-    for (int i = 1; i < argc; ++i)
-    {
-        if ((strcmp(argv[i], "-t") == 0))
-        {
-            double value;
-
-            if (i == argc - 1)
-            {
-                throw ParseError(std::string("mandatory argument of command line option \"") + argv[i] + "\" is absent");
-            }
-
-            int args_assigned = sscanf(argv[i + 1], "%lf", &value);
-            if (args_assigned != 1)
-            {
-                throw ParseError(std::string("invalid argument to command line option \"") + argv[i] + "\": \"" + argv[i + 1] + "\"");
-            }
-
-            time_limit = value;
-
-            ++i; // we've used up an argv member
-
-        } // end of time_limit option handling
-
-        else if ((strcmp(argv[i], "-q") == 0) || (strcmp(argv[i], "-M") == 0) || (strcmp(argv[i], "-n") == 0))
-        {
-            if (i == argc - 1)
-            {
-                throw ParseError(std::string("mandatory argument of command line option \"") + argv[i] + "\" is absent");
-            }
-
-            unsigned lo, hi;
-
-            int args_assigned = sscanf(argv[i + 1], "%u-%u", &lo, &hi);
-            if (args_assigned != 2)
-            {
-                int args_assigned = sscanf(argv[i + 1], "%u", &lo);
-                if (args_assigned != 1)
-                {
-                    throw ParseError(std::string("invalid argument to command line option \"") + argv[i] + "\": \"" + argv[i + 1] + "\"");
-                }
-                hi = lo;
-            }
-
-            if (strcmp(argv[i], "-q") == 0)
-            {
-                q_lo = std::max(1u, lo); // at least 1
-                q_hi = std::max(1u, hi); // at least 1
-            }
-            else if (strcmp(argv[i], "-M") == 0)
-            {
-                M_lo = std::max(2u, lo); // at least 2
-                M_hi = std::max(2u, hi); // at least 2
-            }
-            else if (strcmp(argv[i], "-n") == 0)
-            {
-                n_lo = std::max(1u, lo); // at least 1
-                n_hi = std::max(1u, hi); // at least 1
-            }
-
-            ++i; // we've used up an argv member
-        } // end of q/M/n option handling
-        else
-        {
-            throw ParseError(std::string("encountered unknown command line option \"") + argv[i] + "\"");
-        }
-    } // end of loop to walk argv
-}
-
-typedef std::valarray<unsigned> UnsignedValArray;
-typedef std::valarray<unsigned> BooleanValArray;
-
-// We need this to be able to stuff valarrays into a into a map.
-// Their default "less" function is no good, since it is element-wise.
+// We need this to be able to stuff valarrays into a map.
+// The default "less" function for valarrays is not usable, since it is element-wise.
 
 template <typename T>
 struct compare_valarray
@@ -192,11 +100,10 @@ struct compare_valarray
     }
 };
 
-typedef std::map<BooleanValArray, unsigned, compare_valarray<BooleanValArray> > DeltaMapType; // records pairs of delta (0 or 1) and multiplicity
-//typedef std::vector<std::pair<BooleanValArray, unsigned> > DeltaType; // records pairs of delta (0 or 1) and multiplicity
+typedef map<BooleanValArray, unsigned, compare_valarray<BooleanValArray> > DeltaMapType; // records pairs of delta (0 or 1) and multiplicity
+//typedef vector<pair<BooleanValArray, unsigned> > DeltaType; // records pairs of delta (0 or 1) and multiplicity
 typedef DeltaMapType DeltaType; // records pairs of delta (0 or 1) and multiplicity
 
-class Timeout {};
 
 static void count_codes (
         const DeltaType::const_iterator & delta_curr,   /* IN changes */
@@ -207,21 +114,10 @@ static void count_codes (
         const unsigned long current_multiplicity,       /* IN changes */
               unsigned long * count_of_configurations,  /* OUT result */
               unsigned long * count_of_recursive_calls, /* OUT result */
-              std::vector<mpz_class> & dcount,          /* OUT result */
-        const clock_t start_time,                       /* IN  const  */
-        const double time_limit                         /* IN  const  */
-    ) throw (Timeout)
+              vector<mpz_class> & dcount                /* OUT result */
+    )
 {
     ++(*count_of_recursive_calls);
-
-    if (*count_of_recursive_calls % 1048576 == 0) // check every one million calls or thereabouts.
-    {
-        clock_t current_time = clock();
-        if (static_cast<double>(current_time - start_time) / static_cast<double>(CLOCKS_PER_SEC) > time_limit)
-        {
-            throw Timeout(); // BAIL OUT if time limit is exceeded.
-        }
-    }
 
     if (delta_curr == delta_end)
     {
@@ -251,9 +147,7 @@ static void count_codes (
             1,
             count_of_configurations,
             count_of_recursive_calls,
-            dcount,
-            start_time,
-            time_limit
+            dcount
         );
 
         // Option 2. Add a column of the current type.
@@ -277,9 +171,7 @@ static void count_codes (
                 current_multiplicity + 1,
                 count_of_configurations,
                 count_of_recursive_calls,
-                dcount,
-                start_time,
-                time_limit
+                dcount
             );
 
         } // end of if
@@ -301,11 +193,11 @@ static DeltaType prepare_delta(unsigned q, unsigned M)
     unsigned long nr_of_poss_columns = power(q, M);
     unsigned long nr_of_pairs        = M * (M - 1) / 2;
 
-    // "deltaMap" contains the same data as "delta", but in a map, for easy lookup during setup.
+    // "deltaMap" contains the same information as "delta", but in a map, for easy lookup during setup.
 
     DeltaMapType deltaMap;
 
-    // walk over all possible columns
+    // Walk over all possible columns.
     for (unsigned long c = 0; c < nr_of_poss_columns; ++c)
     {
         // What will be the delta vector of this column choice?
@@ -317,9 +209,9 @@ static DeltaType prepare_delta(unsigned q, unsigned M)
             for (unsigned digit_2 = digit_1 + 1; digit_2 < M; ++digit_2)
             {
                 columnDelta[z++] = (digit(c, q, digit_1) != digit(c, q, digit_2));
-            } // digit_2 loop
-        } // digit_1 loop
-        assert (z == nr_of_pairs);
+            }
+        }
+        assert(z == nr_of_pairs);
 
         // Insert or update the entry for deltaColumn in the deltaAsMap.
 
@@ -328,7 +220,7 @@ static DeltaType prepare_delta(unsigned q, unsigned M)
         if (findDeltaMapEntry == deltaMap.end())
         {
             // It is not there, yet. Add it, with multiplicity 1.
-            deltaMap.insert(std::make_pair(columnDelta, 1)); // insert with count 1
+            deltaMap.insert(make_pair(columnDelta, 1)); // insert with count 1
         }
         else
         {
@@ -346,210 +238,75 @@ static DeltaType prepare_delta(unsigned q, unsigned M)
     return delta;
 }
 
-static void process_settings(std::ostream & os, const Settings & settings)
-{
-    // Show parameters in output.
-
-    os << "# PROCESSING REQUESTED PARAMETERS"      " "
-        "q_lo"       " " << settings.q_lo       << " "
-        "q_hi"       " " << settings.q_hi       << " "
-        "M_lo"       " " << settings.M_lo       << " "
-        "M_hi"       " " << settings.M_hi       << " "
-        "n_lo"       " " << settings.n_lo       << " "
-        "n_hi"       " " << settings.n_hi       << " "
-        "time_limit" " " << settings.time_limit << std::endl;
-
-    double T1 = gettime();
-    clock_t C1 = clock();
-
-    // Walk 'q', which is the number of symbols used in the code matrix.
-
-    os << "# STARTING q-LOOP" << std::endl;
-
-    for (unsigned q = settings.q_lo; q <= settings.q_hi; ++q)
-    {
-        // Walk 'M', which is the number of rows in the code-matrix.
-
-        os << "# STARTING M-LOOP q " <<  q << std::endl;
-
-        for (unsigned M = settings.M_lo; M <= settings.M_hi; ++M)
-        {
-            os << "# PREPARING DELTA q " << q << " M " << M << std::endl;
-
-            double  T1 = gettime();
-            clock_t C1 = clock();
-
-            DeltaType delta(prepare_delta(q, M));
-
-            double T2 = gettime();
-            clock_t C2 = clock();
-
-            double wallclock_time = T2 - T1;
-            double cpu_time = static_cast<double>(C2 - C1) / static_cast<double>(CLOCKS_PER_SEC);
-
-            unsigned long nr_of_pairs        = M * (M - 1) / 2;
-            unsigned long nr_of_poss_columns = power(q, M);
-            unsigned long nr_of_diff_columns = delta.size();
-
-            os << "# PREPARED DELTA"                              " "
-                "q"                  " " << q                  << " "
-                "M"                  " " << M                  << " "
-                "wallclock_time"     " " << wallclock_time     << " "
-                "cpu_time"           " " << cpu_time           << " "
-                "nr_of_poss_columns" " " << nr_of_poss_columns << " "
-                "nr_of_diff_columns" " " << nr_of_diff_columns << " "
-                "nr_of_pairs"        " " << nr_of_pairs        << std::endl;
-
-            // The "delta" datastructure is now in place. we can now start to count codes.
-
-            // Walk "n", which is the number of columns in the code matrix.
-
-            try // n-loop
-            {
-                os << "# STARTING n-LOOP q " << q << " M " << M << std::endl;
-
-                for (unsigned n = settings.n_lo; n <= settings.n_hi; ++n)
-                {
-                    os << "# COUNTING CODES q " << q << " M " << M << " n " << n << std::endl;
-
-                    double T1 = gettime();
-                    clock_t C1 = clock();
-
-                    // number of configurations we will visit: Binomial[ n + nr_of_diff_columns, n ]
-                    // nr of configurations that add up to n:
-                    // Binomial[ n + nr_of_diff_columns - 1, nr_of_diff_columns - 1 ]
-                    // unsigned long long nr_of_configurations = binomial( n + nr_of_diff_columns - 1, nr_of_diff_columns - 1);
-
-                    unsigned long count_of_recursive_calls = 0;
-                    unsigned long count_of_configurations = 0;
-
-                    try // count_codes call
-                    {
-                        // Declare dcounts for all possible values of 'd', and initialize it to zero.
-
-                        std::vector<mpz_class> dcount(n + 1);
-
-                        // Count the number of codes represented (pre-multiply to n!)
-
-                        mpz_class codes_represented;
-                        mpz_fac_ui(codes_represented.get_mpz_t(), n); // set numerator to n!
-
-                        // dpairs[i] records the distance for a given pair during the search.
-                        UnsignedValArray d_pairs(nr_of_pairs); // it is assumed that this will clear all entries to zero
-
-                        // the following code may throw an exception!
-                        count_codes(
-                            delta.begin(),
-                            delta.end(),
-                            n,
-                            d_pairs,
-                            codes_represented,
-                            1,
-                            &count_of_configurations,
-                            &count_of_recursive_calls,
-                            dcount,
-                            C1,
-                            settings.time_limit
-                        );
-
-                        double T2 = gettime();
-                        clock_t C2 = clock();
-
-                        double wallclock_time = T2 - T1;
-                        double cpu_time = static_cast<double>(C2 - C1) / static_cast<double>(CLOCKS_PER_SEC);
-
-                        // Keep a running total of all codes counted.
-                        mpz_class count_of_codes;
-
-                        // Walk all possible d, and emit dcount.
-                        for (unsigned d = 0; d <= n; ++d)
-                        {
-                            count_of_codes += dcount[d];
-                            os << "q " << q << " M " << M << " n " << n << " d " << d << " count " << dcount[d] << std::endl;
-                        }
-
-                        if (true) // check assertion?
-                        {
-                            // Check that count_of_codes equals q ** (M * n)
-
-                            mpz_class expected_count_of_codes;
-                            mpz_ui_pow_ui(expected_count_of_codes.get_mpz_t(), q, n * M);
-
-                            assert(count_of_codes == expected_count_of_codes);
-                        }
-
-                        os << "# COUNTING CODES DONE"                                     " "
-                            "q"                        " " << q                        << " "
-                            "M"                        " " << M                        << " "
-                            "n"                        " " << n                        << " "
-                            "wallclock_time"           " " << wallclock_time           << " "
-                            "cpu_time"                 " " << cpu_time                 << " "
-                            "count_of_configurations"  " " << count_of_configurations  << " "
-                            "count_of_recursive_calls" " " << count_of_recursive_calls << std::endl;
-
-                    } // end of try-block: count_codes
-                    catch (const Timeout &)
-                    {
-                        double T2 = gettime();
-                        clock_t C2 = clock();
-
-                        double wallclock_time = T2 - T1;
-                        double cpu_time = static_cast<double>(C2 - C1) / static_cast<double>(CLOCKS_PER_SEC);
-
-                        os  << "# COUNTING CODES ABORTED: TIMEOUT"                                   " "
-                            "q"                        " "            << q                        << " "
-                            "M"                        " "            << M                        << " "
-                            "n"                        " "            << n                        << " "
-                            "wallclock_time"           " "            << wallclock_time           << " "
-                            "cpu_time"                 " "            << cpu_time                 << " "
-                            "count_of_configurations"  " " "INVALID_" << count_of_configurations  << " "
-                            "count_of_recursive_calls" " " "INVALID_" << count_of_recursive_calls << std::endl;
-
-                        throw; // re-throw the exception
-
-                    } // end of try/catch block for count_codes call
-                } // n loop
-
-                os << "# FINISHED n-LOOP q " << q << " M " << M << std::endl;
-
-            } // end of try n-loop
-            catch (const Timeout &)
-            {
-                os << "# ABORTED n-LOOP q " << q << " M " << M << std::endl;
-            } // end of try/catch n-loop
-
-        } // M loop
-
-        os << "# FINISHED M-LOOP q " << q << std::endl;
-
-    } // q loop
-
-    os << "# FINISHED q-LOOP" << std::endl;
-
-    double T2 = gettime();
-    clock_t C2 = clock();
-
-    double wallclock_time = T2 - T1;
-    double cpu_time = static_cast<double>(C2 - C1) / static_cast<double>(CLOCKS_PER_SEC);
-
-    os << "# FINISHED PROCESSING REQUESTED PARAMETERS" " "
-        "wallclock_time" " " << wallclock_time <<      " "
-        "cpu_time"       " " << cpu_time       <<      std::endl;
-}
-
 int main(int argc, char ** argv)
 {
-    try
+   unsigned q, M, n;
+
+    // Parse command line parameters.
+
+    if (argc != 4 || parse_unsigned(argv[1], &q) != 0 || parse_unsigned(argv[2], &M) != 0 || parse_unsigned(argv[3], &n) != 0 || q < 1 || M < 2 || n < 1)
     {
-        Settings settings(argc, argv);
-        std::cout << std::fixed << std::setprecision(6);
-        process_settings(std::cout, settings);
-    }
-    catch (const Settings::ParseError & err)
-    {
-        std::cout << "# Error while parsing command line options: " << err.message << " - exiting." << std::endl;
+        cerr <<
+            "Usage: " << argv[0] << " <q> <M> <n>"                       "\n"
+                                                                         "\n"
+            "  q -- the number of code symbols in the alphabet ; q >= 1" "\n"
+            "  M -- the number of code words                   ; M >= 2" "\n"
+            "  n -- the number of code symbols per code word   ; n >= 1" "\n" << endl;
+
         return EXIT_FAILURE;
     }
+
+    // cout << fixed << setprecision(6);
+
+    const DeltaType delta = prepare_delta(q, M);
+
+    const unsigned long nr_of_pairs        = M * (M - 1) / 2;
+    const unsigned long nr_of_poss_columns = power(q, M);
+    const unsigned long nr_of_diff_columns = delta.size();
+
+    unsigned long count_of_recursive_calls = 0;
+    unsigned long count_of_configurations = 0;
+
+    // Declare dcounts array for all possible values of 'd' (0 .. n), and initialize values to zero.
+
+    vector<mpz_class> dcount(n + 1);
+
+    // Count the number of codes represented (pre-multiply to n!)
+
+    mpz_class codes_represented;
+    mpz_fac_ui(codes_represented.get_mpz_t(), n); // set numerator to n! (i.e., factorial(n)).
+
+    // dpairs[i] records the distance for a given pair during the search.
+    // All entries are initialized to to zero.
+
+    UnsignedValArray d_pairs(nr_of_pairs);
+
+    count_codes(
+        delta.begin(),
+        delta.end(),
+        n,
+        d_pairs,
+        codes_represented,
+        1,
+        &count_of_configurations,
+        &count_of_recursive_calls,
+        dcount
+    );
+
+    // Walk all possible d, and emit dcount.
+    for (unsigned d = 0; d <= n; ++d)
+    {
+        cout << "q " << q << " M " << M << " n " << n << " d " << d << " count " << dcount[d] << endl;
+    }
+
+    cout << "# COUNTING CODES DONE:"                                  " "
+        "q"                        " " << q                        << " "
+        "M"                        " " << M                        << " "
+        "n"                        " " << n                        << " "
+        "nr_of_poss_columns"       " " << nr_of_poss_columns       << " "
+        "nr_of_diff_columns"       " " << nr_of_diff_columns       << " "
+        "count_of_configurations"  " " << count_of_configurations  << " "
+        "count_of_recursive_calls" " " << count_of_recursive_calls << endl;
 
     return EXIT_SUCCESS;
 }
