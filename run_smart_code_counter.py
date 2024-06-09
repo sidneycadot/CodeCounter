@@ -69,9 +69,13 @@ def main():
     queue = multiprocessing.Queue()
 
     num_jobs = 0
-    for q in (2, 3, 4, 5, 6):
-        for m in (2, 3, 4):
-            for n in range(1, 21):
+
+    max_q = 6
+    max_m = 6
+    max_n = 10
+    for q in range(2, max_q + 1):
+        for m in range(2, max_m + 1):
+            for n in range(1, max_n + 1):
                 query = "SELECT COUNT(*) FROM runs WHERE q=? AND m=? and n=?;"
                 (count, ) = con.execute(query, (q, m, n)).fetchone()
                 if count != 0:
@@ -82,13 +86,13 @@ def main():
 
     # Process results as they come in.
 
-    print(f"Number of jobs submitted: {num_jobs}")
+    num_jobs_submitted = num_jobs
 
     while num_jobs != 0:
 
         run_result = queue.get()
 
-        print(f"[{num_jobs}] Processing results of job q={run_result.q} m={run_result.m} n={run_result.n}")
+        print(f"[{num_jobs}/{num_jobs_submitted}] Processing results of job q={run_result.q} m={run_result.m} n={run_result.n} (time: {run_result.wallclock_time:.2f} seconds)")
 
         query = "INSERT INTO runs(q, m, n, wallclock_time, nr_of_poss_columns, nr_of_diff_columns, count_of_configurations, count_of_recursive_calls) VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
         con.execute(query, (run_result.q, run_result.m, run_result.n, run_result.wallclock_time, run_result.nr_of_poss_columns, run_result.nr_of_diff_columns, run_result.count_of_configurations, run_result.count_of_recursive_calls))
