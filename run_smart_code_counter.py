@@ -133,7 +133,7 @@ def run_solver_for(con, q: int, m: int, n: int) -> bool:
         return False
 
     predicted_runtime = predict_runtime(con, q, m, n)
-    if predicted_runtime > 60.0:
+    if predicted_runtime > 3600.0:
         return False
 
     return True
@@ -152,7 +152,7 @@ def main():
     num_runs_active = 0
 
     for q in (2, 3, 4, 5, 6, 7, 8, 9, 10):
-        for m in (2, 3, 4):
+        for m in (2, 3, 4, 5, 6):
             query = "SELECT MAX(n) FROM runs WHERE q=? AND m=?;"
             (last_n, ) = con.execute(query, (q, m)).fetchone()
             next_n = 1 if last_n is None else last_n + 1
