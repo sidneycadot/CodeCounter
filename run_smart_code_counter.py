@@ -109,54 +109,89 @@ def setup_tables(con):
     con.execute(create_counts_table_query)
 
 
-def predict_runtime(con, q: int, m: int, n: int) -> float:
-    query = "SELECT n, cpu_preparation_time + cpu_calculation_time FROM runs WHERE q = ? AND m = ? ORDER BY n;"
-    results = con.execute(query, (q, m)).fetchall()
+class RunJudge:
 
-    if len(results) < 2:
-        return 0.0 # Cannot give a good estimate.
+    def __init__(self, con, max_n: int, max_runtime: float):
+        self.con = con
+        self.max_n = max_n
+        self.max_runtime = max_runtime
 
-    n_values = np.array([f1 for (f1, f2) in results])
-    t_values = np.array([f2 for (f1, f2) in results])
+    def __call__(self, q: int, m: int, n: int) -> bool:
 
-    fitpoly = np.polyfit(n_values, np.log(t_values), deg=2)
+        if n > self.max_n:
+            return False
 
-    log_t_predicted = np.polyval(fitpoly, n)
+        predicted_runtime = self.predict_runtime(q, m, n)
+        if predicted_runtime > self.max_runtime:
+            print(f"Predicted runtime for q={q}, m={m}, n={n} is {predicted_runtime} seconds; stopping now.")
+            return False
 
-    t_predicted = np.exp(log_t_predicted)
+        return True
 
-    return t_predicted
+    def predict_runtime(self, q: int, m: int, n: int) -> float:
 
-def run_solver_for(con, q: int, m: int, n: int) -> bool:
+        max_entries = 10
 
-    if n > 1000:
-        return False
+        query = "SELECT n, total_time FROM (SELECT n, cpu_preparation_time + cpu_calculation_time FROM runs WHERE q = ? AND m = ? ORDER BY n DEC LIMIT ?) ORDER BY n;"
+        results = self.con.execute(query, (q, m, max_entries)).fetchall()
 
-    predicted_runtime = predict_runtime(con, q, m, n)
-    if predicted_runtime > 3600.0:
-        return False
+        n_values = np.array([f1 for (f1, f2) in results])
+        t_values = np.array([f2 for (f1, f2) in results])
 
-    return True
+        if len(n_values) == 0:
+            return 0.0 # Cannot give a good estimate.
+
+        max_time_seen = np.max(t_values)
+
+        if len(n_values) == 1:
+            return max_time_seen
+
+        # If we have at least 2 points, we can make a reasonable fit.
+
+        # For two points, we make a linear fit.
+        # For three points o more, we make a quadratic fit.
+        fit_degree = 2 if len(n_values) <= 2 else 3
+
+        # Note that we fit the log of the times.
+        fit = np.polynomial.Polynomial.fit(n_values, np.log(t_values), deg=fit_degree)
+
+        log_t_predicted = fit(n)
+
+        t_predicted = np.exp(log_t_predicted)
+
+        return max(max_time_seen, t_predicted)
 
 
 def main():
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--pool-size", default=None, type=int)
+    parser.add_argument("--max-q", default=10, type=int)
+    parser.add_argument("--max-m", default=6, type=int)
+    parser.add_argument("--max-n", default=1000, type=int)
+    parser.add_argument("--max-runtime", default=3600.0, type=float)
+
+    args = parser.parse_args()
 
     db_filename = "code_counter_data.sqlite3"
 
     con = sqlite3.connect(db_filename)
     setup_tables(con)
 
-    pool = multiprocessing.Pool()
+    pool = multiprocessing.Pool(args.pool_size)
     queue = multiprocessing.Queue()
 
     num_runs_active = 0
 
-    for q in (2, 3, 4, 5, 6, 7, 8, 9, 10):
-        for m in (2, 3, 4, 5, 6):
+    run_judge = RunJudge(con, args.max_n, args.max_runtime)
+
+    for q in range(2, args.max_q + 1):
+        for m in range(2, args.max_m + 1):
             query = "SELECT MAX(n) FROM runs WHERE q=? AND m=?;"
             (last_n, ) = con.execute(query, (q, m)).fetchone()
             next_n = 1 if last_n is None else last_n + 1
-            if run_solver_for(con, q, m, next_n):
+            if run_judge(q, m, next_n):
                 pool.apply_async(run_smart_code_counter, (q, m, next_n), callback=queue.put)
                 num_runs_active += 1
 
@@ -182,7 +217,7 @@ def main():
         con.commit()
 
         # Determine if we want to initiate a run with the next value of n.
-        if run_solver_for(con, run_result.q, run_result.m, run_result.n + 1):
+        if run_judge(run_result.q, run_result.m, run_result.n + 1):
             pool.apply_async(run_smart_code_counter, (run_result.q, run_result.m, run_result.n + 1), callback=queue.put)
             num_runs_active += 1
 
