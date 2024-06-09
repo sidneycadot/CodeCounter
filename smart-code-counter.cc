@@ -12,13 +12,13 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <ctime>
 #include <string>
 #include <map>
 #include <vector>
 #include <valarray>
 #include <iostream>
 #include <iomanip>
-#include <sys/time.h>
 #include <gmpxx.h>
 
 using namespace std;
@@ -75,7 +75,7 @@ static unsigned digit(unsigned long g, unsigned q, unsigned which)
 typedef valarray<unsigned> UnsignedValArray;
 typedef valarray<unsigned> BooleanValArray;
 
-// We need this to be able to stuff valarrays into a map.
+// We need this to be able to use valarrays as keys for a map.
 // The default "less" function for valarrays is not usable, since it is element-wise.
 
 template <typename T>
@@ -100,84 +100,8 @@ struct compare_valarray
     }
 };
 
-typedef map<BooleanValArray, unsigned, compare_valarray<BooleanValArray> > DeltaMapType; // records pairs of delta (0 or 1) and multiplicity
-//typedef vector<pair<BooleanValArray, unsigned> > DeltaType; // records pairs of delta (0 or 1) and multiplicity
-typedef DeltaMapType DeltaType; // records pairs of delta (0 or 1) and multiplicity
-
-
-static void count_codes (
-        const DeltaType::const_iterator & delta_curr,   /* IN changes */
-        const DeltaType::const_iterator & delta_end,    /* IN const   */
-        const unsigned nr_of_columns_to_fill,           /* IN changes */
-        const UnsignedValArray & d_pairs,               /* IN changes */
-        const mpz_class & codes_represented,            /* IN changes */
-        const unsigned long current_multiplicity,       /* IN changes */
-              unsigned long * count_of_configurations,  /* OUT result */
-              unsigned long * count_of_recursive_calls, /* OUT result */
-              vector<mpz_class> & dcount                /* OUT result */
-    )
-{
-    ++(*count_of_recursive_calls);
-
-    if (delta_curr == delta_end)
-    {
-        if (nr_of_columns_to_fill == 0) // if we have filled all columns
-        {
-            // determine d, the minimal pair-wise distance
-            const unsigned d_min = d_pairs.min();
-
-            dcount[d_min] += codes_represented;
-
-            ++(*count_of_configurations);
-        }
-    }
-    else
-    {
-        // Option 1. Advance to next possible column (no more columns of the current type)
-
-        DeltaType::const_iterator new_delta_curr(delta_curr);
-        ++new_delta_curr;
-
-        count_codes(
-            new_delta_curr,
-            delta_end,
-            nr_of_columns_to_fill,
-            d_pairs,
-            codes_represented,
-            1,
-            count_of_configurations,
-            count_of_recursive_calls,
-            dcount
-        );
-
-        // Option 2. Add a column of the current type.
-
-        if (nr_of_columns_to_fill > 0) // only possible if columns remain to be filled, skip otherwise.
-        {
-            mpz_class new_codes_represented(codes_represented);
-
-            new_codes_represented *= delta_curr->second;
-            // assert(mpz_divisible_ui_p(new_codes_represented, i));
-            mpz_divexact_ui(new_codes_represented.get_mpz_t(), new_codes_represented.get_mpz_t(), current_multiplicity);
-
-            UnsignedValArray new_d_pairs(d_pairs + delta_curr->first);
-
-            count_codes(
-                delta_curr,
-                delta_end,
-                nr_of_columns_to_fill - 1,
-                new_d_pairs,
-                new_codes_represented,
-                current_multiplicity + 1,
-                count_of_configurations,
-                count_of_recursive_calls,
-                dcount
-            );
-
-        } // end of if
-
-    } // end of else
-}
+typedef map<BooleanValArray, unsigned, compare_valarray<BooleanValArray>> DeltaMapType; // records pairs of delta (0 or 1) and multiplicity
+typedef vector<pair<BooleanValArray, unsigned>> DeltaType; // records pairs of delta (0 or 1) and multiplicity
 
 static DeltaType prepare_delta(unsigned q, unsigned M)
 {
@@ -186,56 +110,122 @@ static DeltaType prepare_delta(unsigned q, unsigned M)
     // For each possible column "c", we will calculate the effect of having such a column in our matrix on the
     //   (M over 2) pairs of rows.
     //
-    // We do a clever trick here. Some choices of columns have an identical effect on all the pairswise Hamming distances.
-    // The most obvious case is forcing the first column to be zero by substracting a constant from a column, but there are others.
-    // We count those columns as having a certain "duplicity".
+    // Some choices of columns have an identical effect on all the pairswise Hamming distances.
+    // We count those columns as having a certain 'multiplicity'.
 
-    unsigned long nr_of_poss_columns = power(q, M);
-    unsigned long nr_of_pairs        = M * (M - 1) / 2;
+    unsigned long number_of_possible_columns = power(q, M);
+    unsigned long number_of_pairs            = M * (M - 1) / 2;
 
     // "deltaMap" contains the same information as "delta", but in a map, for easy lookup during setup.
 
-    DeltaMapType deltaMap;
+    DeltaMapType delta_map;
 
     // Walk over all possible columns.
-    for (unsigned long c = 0; c < nr_of_poss_columns; ++c)
+    for (unsigned long c = 0; c < number_of_possible_columns; ++c)
     {
         // What will be the delta vector of this column choice?
-        BooleanValArray columnDelta(nr_of_pairs);
+        BooleanValArray column_delta(number_of_pairs);
 
         unsigned z = 0;
         for (unsigned digit_1 = 0; digit_1 < M; ++digit_1)
         {
             for (unsigned digit_2 = digit_1 + 1; digit_2 < M; ++digit_2)
             {
-                columnDelta[z++] = (digit(c, q, digit_1) != digit(c, q, digit_2));
+                column_delta[z++] = (digit(c, q, digit_1) != digit(c, q, digit_2));
             }
         }
-        assert(z == nr_of_pairs);
+        assert(z == number_of_pairs);
 
-        // Insert or update the entry for deltaColumn in the deltaAsMap.
+        // Insert or update the entry for delta_column in the delta_map.
 
-        DeltaMapType::iterator findDeltaMapEntry = deltaMap.find(columnDelta);
+        DeltaMapType::iterator find_delta_map_entry = delta_map.find(column_delta);
 
-        if (findDeltaMapEntry == deltaMap.end())
+        if (find_delta_map_entry == delta_map.end())
         {
-            // It is not there, yet. Add it, with multiplicity 1.
-            deltaMap.insert(make_pair(columnDelta, 1)); // insert with count 1
+            // This 'comn_delta' value has not been seen before. Add it with multiplicity 1.
+            delta_map.insert(make_pair(column_delta, 1));
         }
         else
         {
-            // It is there already. Increment its multiplicity.
-            ++findDeltaMapEntry->second; // increment count
+            // It is already present in the map. Increment its multiplicity.
+            ++find_delta_map_entry->second;
         }
 
     } // walk all possible columns
 
-    // We're done calculating deltaMap. Copy it into "delta", and dispose of it.
-    // "delta" will hold the delta-vector for each possible column, plus the number of possible columns that have this delta.
+    // Copy data gathered in 'delta_map' into 'delta'.
 
-    DeltaType delta(deltaMap.begin(), deltaMap.end());
+    DeltaType delta(delta_map.begin(), delta_map.end());
 
     return delta;
+}
+
+
+static void count_codes (
+        const DeltaType::const_iterator & delta_current,
+        const DeltaType::const_iterator & delta_end,
+        const unsigned number_of_columns_to_fill,
+        const UnsignedValArray & d_pairs,
+        const mpz_class & codes_represented,
+        const unsigned long current_multiplicity,
+        unsigned long & count_configurations,
+        unsigned long & count_recursive_calls,
+        vector<mpz_class> & dcount
+    )
+{
+    ++count_recursive_calls;
+
+    if (delta_current == delta_end)
+    {
+        if (number_of_columns_to_fill == 0) // if we have filled all columns
+        {
+            // determine d, the minimal pair-wise distance
+            const unsigned d_min = d_pairs.min();
+
+            dcount[d_min] += codes_represented;
+
+            ++count_configurations;
+        }
+    }
+    else
+    {
+        // Option 1. Advance to next possible column (no more columns of the current type)
+
+        count_codes(
+            delta_current + 1,
+            delta_end,
+            number_of_columns_to_fill,
+            d_pairs,
+            codes_represented,
+            1,
+            count_configurations,
+            count_recursive_calls,
+            dcount
+        );
+
+        // Option 2. Add a column of the current type.
+
+        if (number_of_columns_to_fill > 0) // only possible if columns remain to be filled, skip otherwise.
+        {
+            mpz_class new_codes_represented(codes_represented);
+            new_codes_represented *= delta_current->second;
+            mpz_divexact_ui(new_codes_represented.get_mpz_t(), new_codes_represented.get_mpz_t(), current_multiplicity);
+
+            UnsignedValArray new_d_pairs(d_pairs + delta_current->first);
+
+            count_codes(
+                delta_current,
+                delta_end,
+                number_of_columns_to_fill - 1,
+                new_d_pairs,
+                new_codes_represented,
+                current_multiplicity + 1,
+                count_configurations,
+                count_recursive_calls,
+                dcount
+            );
+        }
+    }
 }
 
 int main(int argc, char ** argv)
@@ -256,16 +246,22 @@ int main(int argc, char ** argv)
         return EXIT_FAILURE;
     }
 
-    // cout << fixed << setprecision(6);
+    const clock_t cpu_preparation_t1 = clock();
 
     const DeltaType delta = prepare_delta(q, M);
 
-    const unsigned long nr_of_pairs        = M * (M - 1) / 2;
-    const unsigned long nr_of_poss_columns = power(q, M);
-    const unsigned long nr_of_diff_columns = delta.size();
+    const clock_t cpu_preparation_t2 = clock();
 
-    unsigned long count_of_recursive_calls = 0;
-    unsigned long count_of_configurations = 0;
+    const double cpu_preparation_time = static_cast<double>(cpu_preparation_t2 - cpu_preparation_t1) / CLOCKS_PER_SEC;
+
+    const unsigned long number_of_pairs             = M * (M - 1) / 2;
+    const unsigned long number_of_possible_columns  = power(q, M);
+    const unsigned long number_of_different_columns = delta.size();
+
+    // Counters that are updated while generating the codes.
+
+    unsigned long count_recursive_calls = 0;
+    unsigned long count_configurations  = 0;
 
     // Declare dcounts array for all possible values of 'd' (0 .. n), and initialize values to zero.
 
@@ -279,7 +275,9 @@ int main(int argc, char ** argv)
     // dpairs[i] records the distance for a given pair during the search.
     // All entries are initialized to to zero.
 
-    UnsignedValArray d_pairs(nr_of_pairs);
+    UnsignedValArray d_pairs(number_of_pairs);
+
+    const clock_t cpu_calculation_t1 = clock();
 
     count_codes(
         delta.begin(),
@@ -288,25 +286,34 @@ int main(int argc, char ** argv)
         d_pairs,
         codes_represented,
         1,
-        &count_of_configurations,
-        &count_of_recursive_calls,
+        count_configurations,
+        count_recursive_calls,
         dcount
     );
 
-    // Walk all possible d, and emit dcount.
+    const clock_t cpu_calculation_t2 = clock();
+
+    const double cpu_calculation_time = static_cast<double>(cpu_calculation_t2 - cpu_calculation_t1) / CLOCKS_PER_SEC;
+
+    // Print results.
+
+    cout << fixed << setprecision(6);
+
+    cout << "# CODE COUNTER RESULTS:"                                        " "
+        "q"                            " " << q                           << " "
+        "M"                            " " << M                           << " "
+        "n"                            " " << n                           << " "
+        "number_of_possible_columns"   " " << number_of_possible_columns  << " "
+        "number_of_differenr_columns"  " " << number_of_different_columns << " "
+        "count_configurations"         " " << count_configurations        << " "
+        "count_recursive_calls"        " " << count_recursive_calls       << " "
+        "cpu_preparation_time"         " " << cpu_preparation_time        << " "
+        "cpu calculation_time"         " " << cpu_calculation_time        << endl;
+
     for (unsigned d = 0; d <= n; ++d)
     {
         cout << "q " << q << " M " << M << " n " << n << " d " << d << " count " << dcount[d] << endl;
     }
-
-    cout << "# COUNTING CODES DONE:"                                  " "
-        "q"                        " " << q                        << " "
-        "M"                        " " << M                        << " "
-        "n"                        " " << n                        << " "
-        "nr_of_poss_columns"       " " << nr_of_poss_columns       << " "
-        "nr_of_diff_columns"       " " << nr_of_diff_columns       << " "
-        "count_of_configurations"  " " << count_of_configurations  << " "
-        "count_of_recursive_calls" " " << count_of_recursive_calls << endl;
 
     return EXIT_SUCCESS;
 }
