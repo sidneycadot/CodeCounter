@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env -S python3 -u
 
 import argparse
 import multiprocessing
@@ -132,7 +132,7 @@ class RunJudge:
 
         max_entries = 10
 
-        query = "SELECT n, total_time FROM (SELECT n, cpu_preparation_time + cpu_calculation_time FROM runs WHERE q = ? AND m = ? ORDER BY n DEC LIMIT ?) ORDER BY n;"
+        query = "SELECT n, total_time FROM (SELECT n, cpu_preparation_time + cpu_calculation_time AS total_time FROM runs WHERE q = ? AND m = ? ORDER BY n DESC LIMIT ?) ORDER BY n;"
         results = self.con.execute(query, (q, m, max_entries)).fetchall()
 
         n_values = np.array([f1 for (f1, f2) in results])
