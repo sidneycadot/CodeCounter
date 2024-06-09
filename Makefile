@@ -5,15 +5,15 @@ LDLIBS=-lgmpxx -lgmp
 
 .PHONY : clean default
 
-default : dumb-code-counter smart-code-counter
+default : dumb_code_counter smart_code_counter
 
-dumb-code-counter : dumb-code-counter.cc
+dumb_code_counter : dumb_code_counter.cc
 
-smart-code-counter : smart-code-counter.cc
+smart_code_counter : smart_code_counter.cc
 
 paper.pdf : paper.tex
 	pdflatex paper.tex
 	pdflatex paper.tex
 
 clean :
-	$(RM) *~ dumb-code-counter smart-code-counter paper.aux paper.log paper.pdf
+	$(RM) *~ dumb_code_counter smart_code_counter paper.aux paper.log paper.pdf
